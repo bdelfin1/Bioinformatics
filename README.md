@@ -1,2 +1,3 @@
 # Bioinformatics
-This is for bioinformatics projects
+This is an actual repository. 
+I made it all by myself.
