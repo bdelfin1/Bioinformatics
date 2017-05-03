@@ -12,4 +12,6 @@ Upon starting the script, the user will be prompted to enter .pdb files for the 
 
 These can be downloaded from the protein databank: http://www.rcsb.org/pdb/home/home.do
 
-To view alignment objects in sequence viewer, make sure only one is selected (all are selected by default). If multiple are selected, only the highest one in the list are shown.
+To view alignment objects (named align_moleculeName) in sequence viewer, make sure only one is selected (all are selected by default). If multiple are selected, only the highest one in the list are shown.
+
+Nonbinding residues exist, but are hidden by default. To enable them, use the [S] in the sidebar next to the 'nonbind' selections.
