@@ -12,3 +12,4 @@ Upon starting the script, the user will be prompted to enter .pdb files for the 
 
 These can be downloaded from the protein databank: http://www.rcsb.org/pdb/home/home.do
 
+To view alignment objects in sequence viewer, make sure only one is selected (all are selected by default). If multiple are selected, only the highest one in the list are shown.
