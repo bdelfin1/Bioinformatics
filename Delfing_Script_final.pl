@@ -11,6 +11,7 @@ my @het;
 my $het; 
 my $dist; #distance from ligand
 my $filename = '/Users/Hubble_Space_Telescope/Desktop/somePymolStuff/testing3.pml'; # file to write to
+#This will be the PyMOL script that runs at the end of the process.
 #currently it uses only one file and rewrites it every time. 
 #I wasn't sure if this would be better or worse than generating a random filename unique to each run,
 #but it makes it a lot easier for testing purposes, instead of flooded my computer with these files.
