@@ -1,95 +1,69 @@
 #!/usr/bin/perl -w
 use strict;
-
-my @filecontents;
+my %pdbFiles; #stores raw file names
+my %moleculeNames; #stores PDB IDs of proteins, taken from the file names
+my %close; #atoms in active site
+my @filecontents; #array of pdb file contents
 my $line;
 my @atom;
 my $atom;
 my @het;
-my $het;
-my $dist;
-my $name;
-my $distance;
-print "Enter the location of a .pdb file:  ";
-my $pdbFile = <STDIN>; # grab pdb file from user
-$pdbFile =~ s/\s+$//; # trim right side of name, basically chomp, but I think it has been more consistent
+my $het; 
+my $dist; #distance from ligand
 my $filename = '/Users/Hubble_Space_Telescope/Desktop/somePymolStuff/testing3.pml'; # file to write to
-my %close;
-print "Enter another location of a .pdb file:  ";
-my @filecontents2;
-my $line2;
-my @atom2;
-my $atom2;
-my @het2;
-my $het2;
-my $dist2;
-my $name2;
-my $distance2;
-my %close2;
-my $pdbFile2 = <STDIN>; # grab pdb file from user
-$pdbFile2 =~ s/\s+$//; # trim right side of name, basically chomp, but I think it has been more consistent
+#currently it uses only one file and rewrites it every time. 
+#I wasn't sure if this would be better or worse than generating a random filename unique to each run,
+#but it makes it a lot easier for testing purposes, instead of flooded my computer with these files.
+for (my $i=0; $i <= 5; $i++) {
+	$pdbFiles{$i} = '';
+}
 
+my $count = 0;
+my $temp = '';
+while ($count <= 5 && $temp ne 'stop') {
+	print "Enter the location of a .pdb file (up to 6, 1 at a time) or type \'stop\':  ";
+	chomp($temp = <STDIN>);
+	if ($temp ne 'stop'){
+		$pdbFiles{$count} = $temp; # grab pdb file from user
+		#$pdbFiles{$count} =~ s/\s+$//; # trim right side of name, basically chomp, but I think it has been more consistent
+		if ($pdbFiles{$count} =~ /\/([\d\w]{4})\./){ #grabs 4 char between '/' and '.', aka the /(2hck).pdb bit
+			$moleculeNames{$count} = $1;
+		}
+		$count++;
+	}
+}
 
-#
-# Example PDB file format for atom type (PERL numbering start w/ 0)
-#
-#          1         2         3         4         5         6         7         8
-#012345678901234567890123456789012345678901234567890123456789012345678901234567890
-#
-#ATOM    145  N   VAL A  25      32.433  16.336  57.540  1.00 11.92      A1   N
-#ATOM    146  CA  VAL A  25      31.132  16.439  58.160  1.00 11.85      A1   C
-#HETATM15786  U   IUM A1102      18.227  57.101 113.666  0.30 28.22           U
-#
-#Record Format
-#
-#COLUMNS      DATA TYPE        FIELD      DEFINITION
-#------------------------------------------------------
-# 1 -  6      Record name      "ATOM    "
-# 7 - 11      Integer          serial     Atom serial number.
-#13 - 16      Atom             name       Atom name.
-#17           Character        altLoc     Alternate location indicator.
-#18 - 20      Residue name     resName    Residue name.
-#22           Character        chainID    Chain identifier.
-#23 - 26      Integer          resSeq     Residue sequence number.
-#27           AChar            iCode      Code for insertion of residues.
-#31 - 38      Real(8.3)        x          Orthogonal coordinates for X in Angstroms
-#39 - 46      Real(8.3)        y          Orthogonal coordinates for Y in Angstroms
-#47 - 54      Real(8.3)        z          Orthogonal coordinates for Z in Angstroms
-#55 - 60      Real(6.2)        occupancy  Occupancy.
-#61 - 66      Real(6.2)        tempFactor Temperature factor.
-#77 - 78      LString(2)       element    Element symbol, right-justified.
-#79 - 80      LString(2)       charge     Charge on the atom.
+open(my $fh, '>', $filename) or die "Could not open file '$filename' $!"; 
+my $fetchLine = "fetch ";
 
+foreach my $key ( keys %moleculeNames ){ #list the molecule names to be fetched
+	$fetchLine .= $moleculeNames{$key};
+	$fetchLine .= " ";
+}
 
-open (INPUT, "< $pdbFile") || die "Could not open file\n";
-chomp(@filecontents = <INPUT>);
-#my $moleculeName = substr $pdbFile, -8, 4; #method 1, grabs 8 char from end, until 4 from end (.pdb)
-my $moleculeName;
-if ($pdbFile =~ /\/([\d\w]{4})\./){ #method 2, grabs 4 char between '/' and '.', aka the /(2hck).pdb bit
-	$moleculeName = $1;
-} #I think the binding_$moleculeName way works fine if you don't chomp filename, but I'm not sure if there's a reason not to do this way
-my $moleculeName2;
-if ($pdbFile2 =~ /\/([\d\w]{4})\./){ #method 2, grabs 4 char between '/' and '.', aka the /(2hck).pdb bit
-	$moleculeName2 = $1;
-} #I think the binding_$moleculeName way works fine if you don't chomp filename, but I'm not sure if there's a reason not to do this way
-printf "$moleculeName $moleculeName2\n"; #just prints the molecule name in command line; not essential
-
-open(my $fh, '>', $filename) or die "Could not open file '$filename' $!";
-print $fh "fetch $moleculeName $moleculeName2, async=0\n hi ev\n sh cartoon\n bg white \n"; #begin pymol script
+print $fh "$fetchLine, async=0\n hi ev\n sh cartoon\n bg white \n"; #begin pymol script
 #A few lines of the beginning, hides everything but cartoon; white bg is nice for screenshots
+print $fh "set cartoon_side_chain_helper, on\n";
+print $fh "set stick_transparency, .7\n"; #makes side chains 70% transparent
+#ligand transparency adjusted separately later
 
-foreach $line (@filecontents) {
+my $ligColor; #determines color for ligand, might end up going with default color instead.
+
+foreach my $key ( keys %moleculeNames ){
+	#print "key: $key, value: $moleculeNames{$key}\n";
+	open (INPUT, "< $pdbFiles{$key}") || die "Could not open file\n";
+	print "looking in  $pdbFiles{$key}\n";
+	chomp(@filecontents = <INPUT>);
+	foreach $line (@filecontents) {
         if (($line =~ /^ATOM/) && ($line =~ /\bCA/)) {
        # if ($line =~ /^ATOM/)  {
                 push(@atom, $line);
         } elsif (($line =~ /^HETATM/) && !($line =~ /HOH/)) { #excluding water seems to have improved results, less clutter
                 push(@het, $line);
         }
-}
-
-
-my $count = 0; #used for labeling selections
-foreach $atom (@atom) {
+		}
+	my $count = 0; #used for labeling selections
+	foreach $atom (@atom) {
         my $x = substr($atom, 31, 8);
         my $y = substr($atom, 39, 8);
         my $z = substr($atom, 47, 8);
@@ -110,146 +84,69 @@ foreach $atom (@atom) {
         				  $close{"$hetresname:$hetchainid:$resname:$chainid:$resnum"}  = $dist;
         	   	
         	   	      	  $resnum =~ s/^\s+//;
-        	            print $fh "sele sele_$count, $chainid/$resname`$resnum/\n";
-        	         	   print $fh "sele sele_$count, sele_$count expand 5\n\n"; # 5 was $dist
+        	            print $fh "sele sele_$count, $chainid/$resname`$resnum/ and $moleculeNames{$key}\n";
+        	         	  print $fh "sele sele_$count, sele_$count expand 5\n\n"; # 5 was $dist
         	           	   # select the predicted active site (and the ligand for now, recolored later)
         	         	   $count++;
         	   
               	}
                 			
         }
-}
+	}
 
-#close INPUT;
-#######second time; probably make this a function later
-open (INPUT2, "< $pdbFile2") || die "Could not open file 2\n";
-chomp(@filecontents2 = <INPUT2>);
-#my $moleculeName = substr $pdbFile, -8, 4; #method 1, grabs 8 char from end, until 4 from end (.pdb)
-#my $moleculeName;
-#if ($pdbFile2 =~ /\/([\d\w]{4})\./){ #method 2, grabs 4 char between '/' and '.', aka the /(2hck).pdb bit
-#	$moleculeName2 = $2;
-#} #I think the binding_$moleculeName way works fine if you don't chomp filename, but I'm not sure if there's a reason not to do this way
-#printf "$moleculeName\n"; #just prints the molecule name in command line; not essential
-
-foreach $line (@filecontents2) {
-        if (($line =~ /^ATOM/) && ($line =~ /\bCA/)) {
-       # if ($line =~ /^ATOM/)  {
-                push(@atom2, $line);
-        } elsif (($line =~ /^HETATM/) && !($line =~ /HOH/)) { #excluding water seems to have improved results, less clutter
-                push(@het2, $line);
-        }
-}
-
-my $count2 = 0; #used for labeling selections
-foreach $atom2 (@atom2) {
-        my $x2 = substr($atom2, 31, 8);
-        my $y2 = substr($atom2, 39, 8);
-        my $z2 = substr($atom2, 47, 8);
-        my $resname2 = substr($atom2, 17, 3);
-        my $chainid2 = substr($atom2, 21, 1);
-        my $resnum2  = substr($atom2, 22, 4);
-
-        foreach $het2 (@het2) {
-                my $a2 = substr($het2, 31, 8);
-                my $b2 = substr($het2, 39, 8);
-                my $c2 = substr($het2, 47, 8);
-        			my $hetresname2 = substr($het2, 17, 3);
-       			my $hetchainid2 = substr($het2, 21, 1);
-     			   	my $hetresnum2  = substr($het2, 22, 4);
-        	
-                my $dist2 = sqrt( ($x2 - $a2)**2 + ($y2 - $b2)**2 + ($z2 - $c2)**2 );
-                if ($dist2 <= 5) {
-        				  $close2{"$hetresname2:$hetchainid2:$resname2:$chainid2:$resnum2"}  = $dist2;
-        	   	
-        	   	      	  $resnum2 =~ s/^\s+//;
-        	            print $fh "sele sele_B_$count2, $chainid2/$resname2`$resnum2/\n";
-        	         	   print $fh "sele sele_B_$count2, sele_B_$count2 expand 5\n\n"; # 5 was $dist
-        	           	   # select the predicted active site (and the ligand for now, recolored later)
-        	         	   $count2++;
-        	   
-              	}
-                			
-        }
-}
-
-
-
-
-my $i = 0;
-print $fh "set cartoon_side_chain_helper, on\n";
-print $fh "sele binding_$moleculeName, ("; 
-while ($i <  $count) {
-			print $fh "sele_$i, ";
-			$i++;
-}
-print $fh ")\n";
-
-$i = 0;
-print $fh "delete ("; 
-while ($i <  $count) {
-			print $fh "sele_$i, ";
-			$i++;
-}
-print $fh ")\n";
-
-
-print $fh "sele nonbind_$moleculeName, !binding_$moleculeName and $moleculeName\n"; # make a new selection with everything not in predicted active site
-
-
-
-print $fh "color gray40, nonbind_$moleculeName\n"; # recolor things not in the selection
-print $fh "desele\n";
-print $fh "sele ligand_$moleculeName, binding_$moleculeName and hetatm and $moleculeName\n"; #selects the hetatms from the selection colored in foreach loop
-print $fh "sele ligand_$moleculeName, ligand_$moleculeName expand 2\n";
-print $fh "sh sticks, binding_$moleculeName and $moleculeName\n";
-print $fh "color red, ligand_$moleculeName\n"; #red seems to be a good color to make it stick out well
-print $fh "set transparency, 0.7, nonbind_$moleculeName\n";
-print $fh "desele\n";
-#########second molecule
-print $fh "sele binding_$moleculeName2, ("; 
-$i = 0;
-while ($i <  $count2) {
-			print $fh "sele_B_$i, ";
-			$i++;
-}
-print $fh ")\n";
-
-$i = 0;
-print $fh "delete ("; 
-while ($i <  $count2) {
-			print $fh "sele_B_$i, ";
-			$i++;
-}
-print $fh ")\n";
-print $fh "sele nonbind_$moleculeName2, !binding_$moleculeName2 and $moleculeName2 \n";
-print $fh "color black, nonbind_$moleculeName2\n"; # recolor things not in the selection
-
-print $fh "desele\n";
-print $fh "sele ligand_$moleculeName2, binding_$moleculeName2 and hetatm and $moleculeName2\n"; #selects the hetatms from the selection colored in foreach loop
-print $fh "sele ligand_$moleculeName2, ligand_$moleculeName2 expand 2\n";
-print $fh "sh sticks, binding_$moleculeName2 and $moleculeName2\n";
-print $fh "color red, ligand_$moleculeName2\n"; #red seems to be a good color to make it stick out well
-print $fh "set transparency, 0.7, nonbind_$moleculeName2\n"; #idk why this isn't working
-print $fh "desele\n";
-print $fh "cealign binding_$moleculeName, binding_$moleculeName2\n";
-
-print $fh "orient binding_$moleculeName\n";
-print $fh "zoom binding_$moleculeName, 15 \n"; #trying to come up with a good starting viewpoint; this seems okay. maybe room to improve
-system('open /Users/Hubble_Space_Telescope/Desktop/somePymolStuff/testing3.pml');	 #runs pymol script.
-close $fh;
-
+	my $i = 0;
 	
-#while (($name, $distance) = each %close) {
-#printf "%s %5.3f\n",$name, $distance;
+	print $fh "sele binding_$moleculeNames{$key}, (";
+	while ($i <  $count) { #making binding site selection out of the temp ones, to reduce clutter
+			print $fh "sele_$i, ";
+			$i++;
+	}
+	print $fh ")\n";
 
-#				}
+	$i = 0;
+	print $fh "delete (";  #getting rid of the temporary selections
+	while ($i <  $count) {
+			print $fh "sele_$i, ";
+			$i++;
+	}
+	print $fh ")\n";
+	 #No idea why, but sele_0 keeps sticking around.
+	#the previous loop SHOULD delete it, and DOES list it to be deleted, but it doesn't actually happen.
+	
+	print $fh "sele nonbind_$moleculeNames{$key}, !binding_$moleculeNames{$key} and $moleculeNames{$key}\n"; # make a new selection with everything not in predicted active site
 
-########test
-#my $moleculeName3 = '2hck';
-#my $testnum = '3';
-#my $testname = $moleculeName.$testnum;
-#print "This is a test: "."$testname"."\n";
-####end test					
+	print $fh "color gray40, nonbind_$moleculeNames{$key}\n"; # recolor things not in the selection
+	print $fh "desele\n";
+	print $fh "sele ligand_$moleculeNames{$key}, binding_$moleculeNames{$key} and hetatm and $moleculeNames{$key}\n"; #selects the hetatms from the selection colored in foreach loop
+	print $fh "sele ligand_$moleculeNames{$key}, ligand_$moleculeNames{$key} expand 2\n";
+	print $fh "sh sticks, ligand_$moleculeNames{$key} and $moleculeNames{$key}\n"; #show ligand as sticks
+	print $fh "set_bond stick_transparency, 0, ligand_$moleculeNames{$key}\n"; #This turns off transparency for the ligands
+	print $fh "sh sticks, binding_$moleculeNames{$key} and $moleculeNames{$key}\n"; #show sticks for side chains
+	
+	$ligColor = 8 * ($key + 1);	#gives color value 8-48 
+	print $fh "color $ligColor$ligColor, ligand_$moleculeNames{$key}\n";
+	#assigns values 88, 1616, 2424, etc to ligands to color them uniquely
+	 #Messing with ligand colors, might use default color instead. 
+	print $fh "desele\n";	
+	print $fh "hi ev, nonbind_$moleculeNames{$key}\n"; #hiding nonbinding by default, since transparency is weird.
+	#possible way to make new objects from selection: 
+	#create <object name>, <selection>
+
+}
+
+foreach my $key ( keys %moleculeNames ){
+	if ($key != 0) {
+		print $fh "align binding_$moleculeNames{$key}, binding_$moleculeNames{0}, object=align_$moleculeNames{$key}\n";
+		#aligns each molecule with the first molecule entered		
+		#the alignment object created here can be used to view the sequence alignment of that molecule in the sequence viewer.
+		print $fh "hi cgo, align_$moleculeNames{$key}\n"; 
+	} #fixed problems with align, cealign had worse output.
+}
+print $fh "set seq_view, 1\n"; #turns on the sequence viewer
+print $fh "orient binding_$moleculeNames{0}\n";
+print $fh "zoom binding_$moleculeNames{0}, 15 \n"; #trying to come up with a good starting viewpoint; this seems okay. maybe room to improve
+system('open /Users/Hubble_Space_Telescope/Desktop/somePymolStuff/testing3.pml');	 #runs pymol script.
+close $fh; 		
 					
 					
 
